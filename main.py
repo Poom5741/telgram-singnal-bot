@@ -79,11 +79,11 @@ def test_connections():
     return True
 
 if __name__ == "__main__":
-    print("Testing strategy with CSV data...")
-    test_strategy_with_csv()
+    # print("Testing strategy with CSV data...")
+    # test_strategy_with_csv()
     
-    print("\nTesting EMA18 calculation...")
-    test_ema18()
+    # print("\nTesting EMA18 calculation...")
+    # test_ema18()
 
     if test_connections():
         print("\nAll tests passed. Starting the bot...")
