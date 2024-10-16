@@ -1,0 +1,6 @@
+.env
+__pycache__/*
+telegram_bot/*
+btc_1h.csv
+
+*.py[cod]
