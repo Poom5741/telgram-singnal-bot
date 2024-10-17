@@ -96,6 +96,16 @@ async def get_latest_price_command(update: Update, context: ContextTypes.DEFAULT
             chat_id=update.effective_chat.id,
             text=f"The latest BTC price is: ${latest_price_data['price']} (as of {latest_price_data['timestamp']})"
         )
+        
+# Function to manually fetch and send BTC price in response to the /btcprice command
+async def btc_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Fetches and sends the current BTC price via the /btcprice command."""
+    price = fetch_btc_price()
+    if price:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"The current BTC price is: ${price['price']}")
+    else:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="Sorry, I couldn't fetch the BTC price.")
+
 
 # Function to handle /dailyTrend command using EMA18 and determine daily trend
 async def daily_trend(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -158,13 +168,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(f"Hello, {update.effective_user.first_name}! Nice to meet you!")
 
 # Main function to set up the bot
+# Main function to set up the bot
 def run_bot():
     application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
     # Add the /start, /greeting, /btcprice, /getprice command handlers
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CommandHandler('greeting', greeting))
-    application.add_handler(CommandHandler('btcprice', btc_price))
+    application.add_handler(CommandHandler('btcprice', btc_price))  # Re-added btc_price function
     application.add_handler(CommandHandler('getprice', get_latest_price_command))
 
     # Add command to list all available commands
