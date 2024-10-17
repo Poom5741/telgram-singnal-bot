@@ -33,18 +33,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def greeting(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Hello! Nice to meet you!")
 
-# Fetch current BTC price using Binance API and store in MongoDB
-async def btc_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    price = fetch_btc_price()
-    if price:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"The current BTC price is: ${price['price']}")
-    else:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="Sorry, I couldn't fetch the BTC price.")
-
-# Function to send scheduled notification
-async def scheduled_btc_price(context: ContextTypes.DEFAULT_TYPE):
-    """Push notification that sends BTC price and signals at a regular interval."""
-    job = context.job
+# Function to fetch BTC price, store in DB, and trigger notifications if a signal occurs
+async def scheduled_fetch_and_signal(context: ContextTypes.DEFAULT_TYPE):
+    """Fetches BTC price and checks for trading signals every hour."""
     price = fetch_btc_price()
     
     if price:
@@ -52,25 +43,31 @@ async def scheduled_btc_price(context: ContextTypes.DEFAULT_TYPE):
         strategy.add_price(price['price'])
         signal = strategy.check_signals()
         
-        # Check for trading signals and notify the user
+        # Notify user only if a trading signal is triggered
         if signal == "BUY":
-            await context.bot.send_message(chat_id=job.chat_id, text=f"BUY signal triggered at BTC price: ${price['price']}")
+            await context.bot.send_message(chat_id=context.job.chat_id, text=f"BUY signal triggered at BTC price: ${price['price']}")
         elif signal == "SELL":
-            await context.bot.send_message(chat_id=job.chat_id, text=f"SELL signal triggered at BTC price: ${price['price']}")
+            await context.bot.send_message(chat_id=context.job.chat_id, text=f"SELL signal triggered at BTC price: ${price['price']}")
         else:
-            await context.bot.send_message(chat_id=job.chat_id, text=f"No trading signal. Current BTC price: ${price['price']}")
+            # Silent data store; no notification for no signal
+            logging.info(f"No trading signal at ${price['price']}. Data stored.")
     else:
-        await context.bot.send_message(chat_id=job.chat_id, text="Could not fetch the BTC price.")
+        logging.error("Could not fetch the BTC price.")
+
+# Start fetching and writing price data to the database every hour automatically
+def start_auto_fetch_and_store(job_queue: JobQueue):
+    """Starts a job that fetches and writes BTC price to the database every hour."""
+    job_queue.run_repeating(scheduled_fetch_and_signal, interval=3600, first=0)  # Run every hour (3600 seconds)
 
 # Add a command to start notifications
 async def start_push_notification(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Start the push notification for BTC price."""
+    """Start the push notification for BTC price with trading signals."""
     chat_id = update.message.chat_id
     job_queue = context.job_queue
-    
-    # Schedule the job to run every hour at :59 minute mark
-    job_queue.run_daily(scheduled_btc_price, time=datetime.time(hour=0, minute=59), chat_id=chat_id)
-    await context.bot.send_message(chat_id=chat_id, text="Started BTC price notifications at :59 of every hour!")
+
+    # Schedule the job to run every hour
+    job_queue.run_repeating(scheduled_fetch_and_signal, interval=3600, first=0, chat_id=chat_id)
+    await context.bot.send_message(chat_id=chat_id, text="Started BTC price fetching every hour with trading signal notifications!")
 
 # Add a command to stop notifications
 async def stop_push_notification(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -183,16 +180,11 @@ def run_bot():
     # Add callback handler for button interaction
     application.add_handler(CallbackQueryHandler(button_callback))
 
+    # Start fetching BTC price data every hour (this happens quietly)
+    start_auto_fetch_and_store(application.job_queue)
+
     # Start polling
     application.run_polling()
 
 if __name__ == '__main__':
     run_bot()
-
-
-
-# ### Explanation:
-# 1. **/dailyTrend Command**: Fetches price data from MongoDB and calculates the daily trend using EMA18.
-# 2. **Scheduled Notifications**: Pushes trading signals every hour at :59.
-# 3. **Command List**: `/list` provides all available commands.
-
